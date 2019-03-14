@@ -1,0 +1,5 @@
+- name: restart guacd
+  service: name=guacd state=restarted
+
+- name: restart tomcat
+  service: name=tomcat state=restarted

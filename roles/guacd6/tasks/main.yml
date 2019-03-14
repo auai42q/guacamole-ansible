@@ -1,0 +1,158 @@
+- name: install library
+  yum: name={{ item }} state=present
+  with_items:
+     - cairo-devel
+     - libjpeg-devel
+     - libpng-devel 
+     - uuid-devel
+     - freerdp-devel
+     - pango-devel
+     - libssh2-devel
+     - libvncserver-devel
+     - pulseaudio-libs-devel
+     - openssl-devel
+     - libvorbis-devel
+     - freerdp-plugins
+
+- name: install guacd
+  yum: name=/tmp/{{ item }} state=present
+  with_items:
+     - guacd-0.9.14-1.el6.x86_64.rpm
+     - libguac-0.9.14-1.el6.x86_64.rpm
+     - libwebp-0.4.3-3.el6.x86_64.rpm
+     - uuid-1.6.1-10.el6.x86_64.rpm
+     
+- name:  install ssh rdp vnc telnet library
+  yum: name=/tmp/{{ item }} state=present
+  with_items:
+     - libguac-client-rdp-0.9.14-1.el6.x86_64.rpm
+     - libguac-client-ssh-0.9.14-1.el6.x86_64.rpm
+     - libguac-client-vnc-0.9.14-1.el6.x86_64.rpm
+     - libvncserver-0.9.7-7.el6_6.1.x86_64.rpm
+     
+- name: install mysql-connector-java
+  yum: name=mysql-connector-java state=present
+  
+- name: install dejavu-sans-mono-fonts
+  yum: name=dejavu-sans-mono-fonts state=present
+   
+- name: install tomcat dependency
+  yum: name={{ item }} state=present
+  with_items:
+     - ecj
+     - jakarta-commons-collections
+     - jakarta-commons-pool
+     - jakarta-commons-dbcp
+     - jakarta-commons-daemon
+     - gdbm-devel
+     - pax
+     - perl-CGI
+     - perl-ExtUtils-MakeMaker
+     - perl-ExtUtils-ParseXS
+     - perl-Test-Harness
+     - perl-Test-Simple
+     - perl-devel
+     - redhat-lsb-core
+     
+- name: install tomcat
+  yum: name=/tmp/{{ item }} state=present
+  with_items:
+     - tomcat-servlet-3.0-api-7.0.90-1.el6.noarch.rpm
+     - tomcat-el-2.2-api-7.0.90-1.el6.noarch.rpm
+     - tomcat-jsp-2.2-api-7.0.90-1.el6.noarch.rpm
+     - tomcat-lib-7.0.90-1.el6.noarch.rpm
+     - tomcat-7.0.90-1.el6.noarch.rpm
+     - tomcat-admin-webapps-7.0.90-1.el6.noarch.rpm
+     - tomcat-docs-webapp-7.0.90-1.el6.noarch.rpm
+     - tomcat-webapps-7.0.90-1.el6.noarch.rpm
+     - jakarta-taglibs-standard-1.1.1-11.8.el6.noarch.rpm
+     - xalan-j2-2.7.0-9.9.el6_5.noarch.rpm
+
+- name: install mysql
+  yum: name={{ item }} state=present
+  with_items:
+     - mysql
+     - mysql-server
+     
+- name: enable mysql&tomcat
+  shell: chkconfig mysqld on&&chkconfig --level 2345 tomcat on
+
+- name: start mysql
+  service: name={{ item }} state=started
+  with_items:
+     - mysqld
+     - guacd
+     - tomcat
+     
+- name: copy war filesystem to webapp
+  copy: src=/tmp/guacamole.war dest=/var/lib/tomcat/webapps/guacamole.war remote_src=yes
+
+- name: create guacd database
+  shell: mysql </tmp/create_guacdb.sql  
+  ignore_errors: yes
+
+- name: exact guacamole-auth-jdbc
+  unarchive: src=/tmp/guacamole-auth-jdbc-0.9.14.tar.gz dest=/tmp remote_src=yes
+  
+- name: import database schemas 
+  shell: cat *.sql | mysql guac_db chdir=/tmp/guacamole-auth-jdbc-0.9.14/mysql/schema
+  ignore_errors: yes
+  
+- name: create MySQL Java module and the authentication extension folders
+  shell: mkdir -p /usr/share/tomcat/.guacamole/extensions&&cp /usr/share/java/mysql-connector-java.jar /usr/share/tomcat/lib
+  
+- name: copy guacamole-auth-jdbc-mysql-0.9.14.jar 
+  copy: src=/tmp/guacamole-auth-jdbc-0.9.14/mysql/guacamole-auth-jdbc-mysql-0.9.14.jar dest=/usr/share/tomcat/.guacamole/extensions remote_src=yes
+  
+- name: change diretory permission
+  shell: chown root:tomcat -R /usr/share/tomcat/.guacamole&&chmod g+s /usr/share/tomcat/.guacamole/ 
+
+- name: create config for data connection
+  copy: src=/tmp/guacamole.properties dest=/usr/share/tomcat/.guacamole/ remote_src=yes
+  notify:
+     - restart guacd
+     - restart tomcat
+
+- name: create certs dir
+  file: path=/etc/pki/nginx state=directory
+
+- name: copy certs to dir
+  shell: cp /tmp/server.* /etc/pki/nginx
+
+- name: install nginx dependency
+  yum : name={{ item }} state=present
+  with_items:
+        - gd
+        - libXpm
+        - libxslt
+
+- name: install Geoip
+  yum: name=/tmp/{{ item }} state=present
+  with_items:
+        - GeoIP-GeoLite-data-extra-2018.04-1.el6.noarch.rpm
+        - GeoIP-GeoLite-data-2018.04-1.el6.noarch.rpm
+        - nginx-filesystem-1.10.2-1.el6.noarch.rpm
+        - geoipupdate-2.2.1-2.el6.x86_64.rpm
+        - GeoIP-1.6.5-1.el6.x86_64.rpm
+
+- name: install nginx
+  yum: name=/tmp/{{ item }} state=present
+  with_items:
+        - nginx-mod-http-geoip-1.10.2-1.el6.x86_64.rpm
+        - nginx-mod-mail-1.10.2-1.el6.x86_64.rpm
+        - nginx-mod-http-xslt-filter-1.10.2-1.el6.x86_64.rpm
+        - nginx-mod-http-image-filter-1.10.2-1.el6.x86_64.rpm
+        - nginx-mod-http-perl-1.10.2-1.el6.x86_64.rpm
+        - nginx-1.10.2-1.el6.x86_64.rpm
+        - nginx-mod-stream-1.10.2-1.el6.x86_64.rpm
+        - nginx-all-modules-1.10.2-1.el6.noarch.rpm
+        
+- name: enable nginx onboot
+  shell: chkconfig nginx on&& mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+
+- name: copy nginx config
+  template: src=nginx.conf dest=/etc/nginx/nginx.conf
+
+- name: start nginx
+  service: name=nginx state=started
+

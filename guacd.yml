@@ -1,0 +1,12 @@
+- hosts: 10.79.50.26
+  gather_facts: yes
+  vars_prompt:
+       - name: guacdpass
+         prompt: please input guacdpasswd
+         private: yes
+  pre_tasks:
+      - name: copy necessary files
+        copy: src=/etc/ansible/roles/guacd6/files/ dest=/tmp
+
+  roles:
+    - guacd6 
